@@ -57,8 +57,6 @@ docker compose up --build
 
 ---
 
----
-
 ## Microservicios
 
 ### products-service · Puerto 8081
