@@ -19,6 +19,7 @@ docker compose up --build
 | **Swagger – products** | http://localhost:8081/swagger-ui.html | Header `X-API-Key: products-secret-key-2024` |
 | **Swagger – inventory** | http://localhost:8082/swagger-ui.html | Header `X-API-Key: inventory-secret-key-2024` |
 | **Swagger – purchase** | http://localhost:8083/swagger-ui.html | Header `X-API-Key: purchase-secret-key-2024` |
+| **Swagger – payment** | http://localhost:8084/swagger-ui.html | Header `X-API-Key: payment-secret-key-2024` |
 | **PostgreSQL** | `localhost:5432` | `inventory_user` / `inventory_pass` |
 
 > Para detener y limpiar volúmenes: `docker compose down -v`
@@ -43,15 +44,20 @@ docker compose up --build
 │              │    :8081        │ │  :8082   │ │     :8083        │  │
 │              └────────┬────────┘ └────┬─────┘ └────────┬─────────┘  │
 │                       │               │                 │           │
+│                       │               │     ┌───────────▼──────────┐ │
+│                       │               │     │     RabbitMQ 3.13    │ │
+│                       │               │     │  inventory.exchange  │ │
+│                       │               │     └───────────┬──────────┘ │
+│                       │               │                 │ purchase.completed.queue
+│                       │               │     ┌───────────▼──────────┐ │
+│                       │               │     │   payment-service    │ │
+│                       │               │     │  Spring Boot 3 :8084 │ │
+│                       │               │     └───────────┬──────────┘ │
+│                       │               │                 │           │
 │              ┌────────▼───────────────▼─────────────────▼────────┐  │
 │              │              PostgreSQL 16  :5432                 │  │
-│              │      products_db │ inventory_db │ purchases_db    │  │
+│              │  products_db │ inventory_db │ purchases_db │ payments_db │
 │              └──────────────────────────────────────────────────-┘  │
-│                                                                     │
-│              ┌──────────────────────────────┐                       │
-│              │      RabbitMQ 3.13 :5672      │◀─ purchase-service   
-│              │   exchange: inventory.exchange│    publica eventos   │
-│              └──────────────────────────────┘                       │
 └─────────────────────────────────────────────────────────────────────┘
 ```
 
@@ -134,6 +140,29 @@ curl -X POST http://localhost:8083/api/v1/purchases \
 
 ---
 
+### payment-service · Puerto 8084
+
+Consume eventos `purchase.completed` de RabbitMQ, simula 1 segundo de procesamiento y persiste el resultado en `payments_db`.
+
+| Método | Ruta | Descripción |
+|---|---|---|
+| `GET` | `/api/v1/payments` | Últimos 100 pagos ordenados por fecha descendente |
+
+**Ejemplo – Consultar pagos:**
+```bash
+curl http://localhost:8084/api/v1/payments \
+  -H "X-API-Key: payment-secret-key-2024"
+```
+
+**Estados de pago:**
+
+| Estado | Descripción |
+|---|---|
+| `PROCESSING` | Evento recibido, procesando (≈1 segundo) |
+| `COMPLETED` | Pago finalizado exitosamente |
+
+---
+
 ## Flujo de Compra – Diagrama de Secuencia
 
 ```mermaid
@@ -146,6 +175,7 @@ sequenceDiagram
     participant IS as inventory-service
     participant DB as PostgreSQL
     participant RMQ as RabbitMQ
+    participant PAY as payment-service
 
     Usuario->>FE: Ingresa cantidad y confirma compra
     FE->>NG: POST /api/v1/purchases
@@ -171,6 +201,15 @@ sequenceDiagram
         RMQ-->>PUS: ack
         PUS-->>FE: 201 { compra creada }
         FE-->>Usuario: Muestra confirmación + stock actualizado
+
+        Note over RMQ,PAY: Flujo asíncrono (purchase.completed.queue)
+        RMQ->>PAY: PurchaseCompletedEvent
+        PAY->>DB: INSERT payments (status=PROCESSING)
+        Note over PAY: Thread.sleep(1 000 ms)
+        PAY->>DB: UPDATE payments (status=COMPLETED)
+        FE->>NG: GET /api/v1/payments (polling cada 3s)
+        NG->>PAY: GET /api/v1/payments
+        PAY-->>FE: 200 lista de pagos
     end
 ```
 
@@ -187,21 +226,26 @@ inventory-fullStack/
 │   │       ├── application/    # Casos de uso (@Service)
 │   │       └── infrastructure/ # Web, JPA, Security
 │   ├── inventory-service/      # Spring Boot 3.3 · Java 21 · Puerto 8082
-│   └── purchase-service/       # Spring Boot 3.3 · Java 21 · Puerto 8083
+│   ├── purchase-service/       # Spring Boot 3.3 · Java 21 · Puerto 8083
+│   │   └── infrastructure/
+│   │       └── messaging/      # Publicación RabbitMQ (AMQP)
+│   └── payment-service/        # Spring Boot 3.3 · Java 21 · Puerto 8084
 │       └── infrastructure/
-│           └── messaging/      # Publicación RabbitMQ (AMQP)
+│           └── messaging/      # Consumo RabbitMQ (AMQP) + delay 1s
 ├── FRONTEND/
 │   ├── src/
 │   │   ├── features/
 │   │   │   ├── products/       # Vistas, componentes y servicios de productos
-│   │   │   └── inventory/      # Vistas, componentes y servicios de inventario
+│   │   │   ├── inventory/      # Vistas, componentes y servicios de inventario
+│   │   │   └── payments/       # Historial de pagos (polling 3s)
 │   │   ├── stores/             # Pinia (products.ts, inventory.ts)
 │   │   ├── plugins/            # Axios con deserializador JSON:API
 │   │   └── assets/styles/      # SASS tokens, mixins, reset (BEM)
 │   ├── nginx.conf              # Reverse proxy + inyección de API Keys
 │   └── Dockerfile              # Build multi-etapa Node → nginx
 ├── scripts/
-│   └── init-db.sql             # Crea products_db, inventory_db, purchases_db
+│   ├── init-db.sql             # Crea products_db, inventory_db, purchases_db, payments_db
+│   └── load-test.mjs           # Prueba de carga: 100 compras/s durante 10 s
 └── docker-compose.yml
 ```
 
@@ -256,6 +300,19 @@ npm run coverage    # reporte de cobertura
 
 ---
 
+### Prueba de Carga
+
+El script `scripts/load-test.mjs` envía 100 compras/segundo durante 10 segundos contra `purchase-service` y mide la cola de pago en tiempo real.
+
+```bash
+# Asegúrate de tener al menos un producto creado con stock suficiente
+node scripts/load-test.mjs
+```
+
+Mientras el script corre, abre http://localhost:5173/payments para ver el historial de pagos actualizarse en vivo con los estados `PROCESSING → COMPLETED`.
+
+---
+
 ### Frontend – Resumen de Pruebas
 
 Framework: **Vitest + Vue Test Utils**. Cada test arranca con una instancia Pinia aislada.
@@ -272,6 +329,9 @@ Framework: **Vitest + Vue Test Utils**. Cada test arranca con una instancia Pini
 
 ### ¿Por qué purchase-service es un servicio independiente?
 La lógica de compra coordina dos dominios (catálogo y stock) y publica eventos asíncronos. Separarla evita acoplar products e inventory, permite escalarla de forma independiente y sigue el principio de responsabilidad única.
+
+### ¿Por qué existe payment-service como consumidor dedicado?
+El evento `purchase.completed` no debería procesarse dentro del mismo servicio que lo publicó (evita bloquear el hilo HTTP de la compra). payment-service es el único consumidor de la cola, simula la latencia de un gateway de pago externo con `Thread.sleep(1 000 ms)` y escribe el estado `PROCESSING → COMPLETED` en su propia base de datos (`payments_db`), respetando el principio de segregación de responsabilidades.
 
 ### Arquitectura Hexagonal
 Cada servicio tiene tres capas: `domain/` (modelos y puertos, sin framework), `application/` (casos de uso con `@Service`) e `infrastructure/` (persistencia, web, mensajería). Permite testear la lógica de negocio sin levantar Spring.
@@ -300,9 +360,11 @@ Centraliza la inyección de API Keys, evita CORS y resuelve nombres DNS de Docke
 | `APP_API_KEY` | products-service | `products-secret-key-2024` |
 | `APP_API_KEY` | inventory-service | `inventory-secret-key-2024` |
 | `APP_API_KEY` | purchase-service | `purchase-secret-key-2024` |
+| `APP_API_KEY` | payment-service | `payment-secret-key-2024` |
 | `PRODUCTS_API_KEY` | frontend/nginx | `products-secret-key-2024` |
 | `INVENTORY_API_KEY` | frontend/nginx | `inventory-secret-key-2024` |
 | `PURCHASE_API_KEY` | frontend/nginx | `purchase-secret-key-2024` |
+| `PAYMENT_API_KEY` | frontend/nginx | `payment-secret-key-2024` |
 | `POSTGRES_USER` | postgres | `inventory_user` |
 | `POSTGRES_PASSWORD` | postgres | `inventory_pass` |
 | `RABBITMQ_DEFAULT_USER` | rabbitmq | `rabbit_user` |

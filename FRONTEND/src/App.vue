@@ -12,6 +12,9 @@ import { RouterView, RouterLink } from 'vue-router'
             <RouterLink to="/products" class="app__link" active-class="app__link--active">
               Productos
             </RouterLink>
+            <RouterLink to="/payments" class="app__link" active-class="app__link--active">
+              Pagos
+            </RouterLink>
           </div>
         </nav>
       </div>
