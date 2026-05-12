@@ -1,0 +1,70 @@
+@use 'tokens' as t;
+
+@mixin flex-center {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+@mixin flex-between {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
+@mixin card {
+  background-color: t.$color-surface;
+  border: 1px solid t.$color-border;
+  border-radius: t.$radius-lg;
+  box-shadow: t.$shadow-sm;
+  padding: t.$spacing-6;
+}
+
+@mixin button-base {
+  display: inline-flex;
+  align-items: center;
+  gap: t.$spacing-2;
+  padding: t.$spacing-2 t.$spacing-4;
+  border: none;
+  border-radius: t.$radius-md;
+  font-size: t.$font-size-sm;
+  font-weight: 500;
+  cursor: pointer;
+  transition: background-color t.$transition-base, opacity t.$transition-base;
+
+  &:disabled {
+    opacity: 0.5;
+    cursor: not-allowed;
+  }
+}
+
+@mixin input-base {
+  width: 100%;
+  padding: t.$spacing-2 t.$spacing-3;
+  border: 1px solid t.$color-border;
+  border-radius: t.$radius-md;
+  font-size: t.$font-size-base;
+  color: t.$color-text;
+  background-color: t.$color-surface;
+  transition: border-color t.$transition-base, box-shadow t.$transition-base;
+
+  &:focus {
+    outline: none;
+    border-color: t.$color-primary;
+    box-shadow: 0 0 0 3px rgb(37 99 235 / 0.1);
+  }
+
+  &.is-invalid {
+    border-color: t.$color-danger;
+  }
+}
+
+@mixin respond-to($breakpoint) {
+  @if $breakpoint == 'sm' {
+    @media (min-width: 640px) { @content; }
+  } @else if $breakpoint == 'md' {
+    @media (min-width: 768px) { @content; }
+  } @else if $breakpoint == 'lg' {
+    @media (min-width: 1024px) { @content; }
+  }
+}

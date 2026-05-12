@@ -1,0 +1,18 @@
+@use 'tokens' as t;
+@use 'reset';
+@use 'mixins' as m;
+
+.container {
+  max-width: 1200px;
+  margin: 0 auto;
+  padding: 0 t.$spacing-4;
+
+  @include m.respond-to('md') {
+    padding: 0 t.$spacing-8;
+  }
+}
+
+.page {
+  min-height: 100vh;
+  padding: t.$spacing-8 0;
+}
