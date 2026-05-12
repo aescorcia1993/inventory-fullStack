@@ -130,6 +130,36 @@ services:
     networks:
       - inventory-net
 
+  payment-service:
+    build:
+      context: ./BACKEND/payment-service
+      dockerfile: Dockerfile
+    container_name: payment-service
+    environment:
+      SPRING_DATASOURCE_URL: jdbc:postgresql://postgres:5432/payments_db
+      SPRING_DATASOURCE_USERNAME: inventory_user
+      SPRING_DATASOURCE_PASSWORD: inventory_pass
+      APP_API_KEY: payment-secret-key-2024
+      RABBITMQ_HOST: rabbitmq
+      RABBITMQ_PORT: 5672
+      RABBITMQ_USERNAME: rabbit_user
+      RABBITMQ_PASSWORD: rabbit_pass
+    ports:
+      - "8084:8080"
+    depends_on:
+      postgres:
+        condition: service_healthy
+      rabbitmq:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD-SHELL", "wget -qO- http://localhost:8080/actuator/health || exit 1"]
+      interval: 15s
+      timeout: 10s
+      retries: 8
+      start_period: 120s
+    networks:
+      - inventory-net
+
   # ─────────────────────────────────────────────
   # Frontend
   # ─────────────────────────────────────────────
@@ -142,6 +172,7 @@ services:
       PRODUCTS_API_KEY: products-secret-key-2024
       INVENTORY_API_KEY: inventory-secret-key-2024
       PURCHASE_API_KEY: purchase-secret-key-2024
+      PAYMENT_API_KEY: payment-secret-key-2024
     ports:
       - "5173:80"
     depends_on:
@@ -150,6 +181,8 @@ services:
       inventory-service:
         condition: service_healthy
       purchase-service:
+        condition: service_healthy
+      payment-service:
         condition: service_healthy
     networks:
       - inventory-net

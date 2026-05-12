@@ -20,6 +20,11 @@ const routes: RouteRecordRaw[] = [
     path: '/inventory/:productId',
     component: () => import('@/features/inventory/views/InventoryView.vue'),
     meta: { title: 'Inventory & Purchase' }
+  },
+  {
+    path: '/payments',
+    component: () => import('@/features/payments/views/PaymentHistoryView.vue'),
+    meta: { title: 'Historial de Pagos' }
   }
 ]
 
