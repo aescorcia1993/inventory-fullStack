@@ -1,0 +1,35 @@
+{
+  "name": "inventory-frontend",
+  "version": "1.0.0",
+  "private": true,
+  "scripts": {
+    "dev": "vite",
+    "build": "vue-tsc --noEmit && vite build",
+    "preview": "vite preview",
+    "test": "vitest run",
+    "test:watch": "vitest",
+    "test:coverage": "vitest run --coverage",
+    "lint": "eslint . --ext .vue,.ts,.tsx"
+  },
+  "dependencies": {
+    "vue": "^3.4.0",
+    "vue-router": "^4.3.0",
+    "pinia": "^2.1.7",
+    "axios": "^1.6.8",
+    "vee-validate": "^4.12.8",
+    "@vee-validate/zod": "^4.12.8",
+    "zod": "^3.22.4"
+  },
+  "devDependencies": {
+    "@vitejs/plugin-vue": "^5.0.4",
+    "vite": "^5.2.0",
+    "typescript": "^5.4.5",
+    "vue-tsc": "^2.0.13",
+    "sass": "^1.75.0",
+    "vitest": "^1.5.0",
+    "@vue/test-utils": "^2.4.5",
+    "@vitest/coverage-v8": "^1.5.0",
+    "jsdom": "^24.0.0",
+    "@types/node": "^20.12.7"
+  }
+}
