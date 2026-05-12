@@ -1,0 +1,52 @@
+server:
+  port: 8080
+
+spring:
+  application:
+    name: purchase-service
+  datasource:
+    url: ${SPRING_DATASOURCE_URL:jdbc:postgresql://localhost:5432/purchases_db}
+    username: ${SPRING_DATASOURCE_USERNAME:purchase_user}
+    password: ${SPRING_DATASOURCE_PASSWORD:purchase_pass}
+    driver-class-name: org.postgresql.Driver
+  jpa:
+    hibernate:
+      ddl-auto: validate
+    show-sql: false
+    properties:
+      hibernate:
+        dialect: org.hibernate.dialect.PostgreSQLDialect
+  flyway:
+    enabled: true
+    baseline-on-migrate: true
+  rabbitmq:
+    host: ${RABBITMQ_HOST:localhost}
+    port: ${RABBITMQ_PORT:5672}
+    username: ${RABBITMQ_USERNAME:rabbit_user}
+    password: ${RABBITMQ_PASSWORD:rabbit_pass}
+
+app:
+  api-key: ${APP_API_KEY:purchase-local-key}
+
+services:
+  products:
+    url: ${PRODUCTS_SERVICE_URL:http://localhost:8081}
+    api-key: ${PRODUCTS_API_KEY:products-local-key}
+  inventory:
+    url: ${INVENTORY_SERVICE_URL:http://localhost:8082}
+    api-key: ${INVENTORY_API_KEY:inventory-local-key}
+
+springdoc:
+  api-docs:
+    path: /v3/api-docs
+  swagger-ui:
+    path: /swagger-ui.html
+
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health,info
+  endpoint:
+    health:
+      show-details: always
